@@ -1,26 +1,39 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: var(--font-sans);
+  
+  --color-primary: #0052FF;
+  --color-primary-foreground: #ffffff;
+  
+  --color-secondary: #0052FF; /* Using same blue as base, or maybe a lighter shade? let's stick to primary */
+  
+  --color-success: #10B981; /* Soft Green */
+  --color-success-foreground: #ffffff;
+
+  /* Custom "medical" grays if needed, but slate/gray usually works */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Custom Base Styles */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a; /* Slate 900 */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f8fafc;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Utility classes for specific needs if any not covered by Tailwind utilities */
+.glass-panel {
+  @apply bg-white/80 backdrop-blur-md border border-gray-100;
 }
