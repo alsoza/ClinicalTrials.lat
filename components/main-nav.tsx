@@ -52,7 +52,6 @@ export function MainNav({ transparent = false }: MainNavProps) {
                     <div className="hidden md:flex gap-8 text-sm font-bold">
                         <Link href="/search" className={linkStyles}>Buscar Estudios</Link>
                         <Link href="/patients" className={linkStyles}>Para Pacientes</Link>
-                        <Link href="/contact" className={linkStyles}>Contacto</Link>
                     </div>
 
                     <div className="flex items-center gap-2">

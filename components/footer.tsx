@@ -71,26 +71,7 @@ export function Footer() {
                         </ul>
                     </div>
 
-                    {/* Contact */}
-                    <div>
-                        <h3 className="text-white font-semibold mb-4">Contacto</h3>
-                        <ul className="space-y-3">
-                            <li className="flex items-center gap-2">
-                                <Mail className="w-4 h-4 text-blue-400" />
-                                <a href="mailto:info@clinicaltrials.lat" className="hover:text-white transition-colors">
-                                    info@clinicaltrials.lat
-                                </a>
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <Phone className="w-4 h-4 text-blue-400" />
-                                <span>+1 (800) 123-4567</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <MapPin className="w-4 h-4 text-blue-400 mt-0.5" />
-                                <span>Latinoamérica</span>
-                            </li>
-                        </ul>
-                    </div>
+
                 </div>
             </div>
 

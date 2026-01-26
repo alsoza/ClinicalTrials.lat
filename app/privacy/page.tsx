@@ -65,8 +65,7 @@ export default function PrivacyPage() {
                                         {[
                                             "Datos de Identificación (Nombre, Email)",
                                             "Ubicación Geográfica",
-                                            "Intereses Terapéuticos",
-                                            "Datos de contacto directo"
+                                            "Intereses Terapéuticos"
                                         ].map((item, i) => (
                                             <div key={i} className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
