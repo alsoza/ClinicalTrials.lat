@@ -8,63 +8,6 @@ import { Search, X, Loader2 } from "lucide-react";
 import { MainNav } from "@/components/main-nav";
 import { getStudies } from "@/app/actions/studies";
 
-// Mock data updated with keyCriteria
-const STUDIES = [
-    {
-        nctId: "NCT04561234",
-        title: "Estudio de Fase 3 para Diabetes Mellitus Tipo 2 con Nuevo Agente Oral",
-        condition: "Diabetes Mellitus Tipo 2",
-        locations: ["Santiago, Chile", "Buenos Aires, Argentina"],
-        status: "Recruiting" as const,
-        phases: ["Fase 3"],
-        keyCriteria: "Pacientes con HbA1c entre 7% y 10.5% sin uso previo de insulina."
-    },
-    {
-        nctId: "NCT01298765",
-        title: "Evaluación de Seguridad de Inmunoterapia en Cáncer de Pulmón Avanzado",
-        condition: "Cáncer de Pulmón No Microcítico",
-        locations: ["Lima, Perú", "Bogotá, Colombia", "Santiago, Chile"],
-        status: "Recruiting" as const,
-        phases: ["Fase 2"],
-        keyCriteria: "Cáncer de pulmón avanzado etapa IV con expresión de PD-L1 > 1%."
-    },
-    {
-        nctId: "NCT09876543",
-        title: "Ensayo Observacional de Hipertensión en Pacientes Geriátricos",
-        condition: "Hipertensión Arterial",
-        locations: ["Lima, Perú", "Arequipa, Perú"],
-        status: "Active, not recruiting" as const,
-        phases: ["Fase 4"],
-        keyCriteria: "Mayores de 65 años con diagnóstico estable de hipertensión por > 1 año."
-    },
-    {
-        nctId: "NCT05647382",
-        title: "Vacuna Preventiva para Virus Respiratorio Sincicial en Lactantes",
-        condition: "Infección por VRS",
-        locations: ["Santiago, Chile", "Valparaíso, Chile"],
-        status: "Completed" as const,
-        phases: ["Fase 3"],
-        keyCriteria: "Lactantes sanos de 6 a 12 meses de edad sin condiciones preexistentes."
-    },
-    {
-        nctId: "NCT03332211",
-        title: "Terapia Génica para Distrofia Muscular de Duchenne",
-        condition: "Distrofia Muscular de Duchenne",
-        locations: ["Bogotá, Colombia", "Santiago, Chile"],
-        status: "Not yet recruiting" as const,
-        phases: ["Fase 1", "Fase 2"],
-        keyCriteria: "Niños de 4 a 7 años con mutación confirmada en el gen de la distrofina."
-    },
-    {
-        nctId: "NCT07778889",
-        title: "Tratamiento para Hígado Graso No Alcohólico (NASH)",
-        condition: "Hepatología",
-        locations: ["Santiago, Chile", "Concepción, Chile"],
-        status: "Recruiting" as const,
-        phases: ["Fase 2"],
-        keyCriteria: "Diagnóstico de esteatohepatitis confirmado por biopsia o fibroscan."
-    }
-];
 
 export default function SearchPage() {
     const searchParams = useSearchParams();
