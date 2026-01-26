@@ -20,10 +20,10 @@ export default async function StudyDetailsPage({ params }: { params: { id: strin
             <MainNav />
 
             <StudyHeader
-                nctId={study.nctId}
-                title={study.title || ""}
-                sponsor={study.leadSponsorName || "Sponsor no especificado"}
-                status={study.status || "Desconocido"}
+                nctId={study.nct_id}
+                title={study.title_es || ""}
+                sponsor={study.lead_sponsor_name || "Sponsor no especificado"}
+                status={study.overall_status || "Desconocido"}
             />
 
             <main className="container mx-auto px-4 py-8">
@@ -33,22 +33,21 @@ export default async function StudyDetailsPage({ params }: { params: { id: strin
                         <section className="bg-white p-6 rounded-xl border border-slate-200 p-8">
                             <h2 className="text-2xl font-bold text-slate-900 mb-4">Resumen del Estudio</h2>
                             <p className="text-slate-700 whitespace-pre-line leading-relaxed text-lg">
-                                {study.summary || "No hay resumen disponible para este estudio."}
+                                {study.brief_summary_es || "No hay resumen disponible para este estudio."}
                             </p>
                         </section>
 
-                        {(study.videoUrl) && (
+                        {(study.video_url) && (
                             <section>
                                 <h2 className="text-2xl font-bold text-slate-900 mb-6">Video Explicativo</h2>
-                                <VideoEmbed videoId={study.videoUrl} />
+                                <VideoEmbed videoId={study.video_url} />
                             </section>
                         )}
 
                         <section className="bg-white p-6 rounded-xl border border-slate-200 p-8">
                             <h2 className="text-2xl font-bold text-slate-900 mb-6">Criterios de Elegibilidad</h2>
                             <EligibilityCriteria
-                                inclusion={study.inclusion}
-                                exclusion={study.exclusion}
+                                structured_eligibility_json={study.structured_eligibility_json}
                             />
                         </section>
                     </div>

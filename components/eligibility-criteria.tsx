@@ -1,11 +1,12 @@
 import { PlusCircle, MinusCircle } from "lucide-react";
 
 interface EligibilityCriteriaProps {
-    inclusion: string[];
-    exclusion: string[];
+    structured_eligibility_json: any;
 }
 
-export function EligibilityCriteria({ inclusion, exclusion }: EligibilityCriteriaProps) {
+export function EligibilityCriteria({ structured_eligibility_json }: EligibilityCriteriaProps) {
+    const inclusion: string[] = Array.isArray(structured_eligibility_json?.inclusion) ? structured_eligibility_json.inclusion : [];
+    const exclusion: string[] = Array.isArray(structured_eligibility_json?.exclusion) ? structured_eligibility_json.exclusion : [];
     return (
         <div className="grid md:grid-cols-2 gap-12">
             <div>

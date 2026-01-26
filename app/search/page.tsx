@@ -118,7 +118,7 @@ export default function SearchPage() {
                         ) : filteredStudies.length > 0 ? (
                             <div className="grid gap-4">
                                 {filteredStudies.map((study) => (
-                                    <StudyCard key={study.nctId} {...study} />
+                                    <StudyCard key={study.nct_id} {...study} />
                                 ))}
                             </div>
                         ) : (
