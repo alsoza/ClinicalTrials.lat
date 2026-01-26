@@ -1,3 +1,5 @@
+'use client';
+
 import { MainNav } from "@/components/main-nav";
 import { Footer } from "@/components/footer";
 import { Mail, Phone, MapPin, Send, MessageSquare, Clock } from "lucide-react";
