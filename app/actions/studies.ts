@@ -1,9 +1,5 @@
 "use server";
 
-import { db } from "@/lib/db";
-import { studiesRaw, studiesAi, studiesCustom } from "@/lib/db/schema";
-import { eq, or, ilike, and, sql } from "drizzle-orm";
-
 export interface SearchFilters {
     query?: string;
     phase?: string[];
@@ -11,120 +7,48 @@ export interface SearchFilters {
     condition?: string;
 }
 
+const API_BASE_URL = "https://api.clinicaltrials.lat/estudios";
+
 export async function getStudies(filters: SearchFilters = {}) {
     try {
-        let whereConditions = [];
-
-        if (filters.query) {
-            const query = `%${filters.query}%`;
-            whereConditions.push(
-                or(
-                    ilike(studiesRaw.nctId, query),
-                    ilike(studiesRaw.briefTitle, query),
-                    ilike(studiesRaw.officialTitle, query),
-                    ilike(studiesRaw.primaryCondition, query),
-                    ilike(studiesAi.titleEs, query),
-                    ilike(studiesAi.titleSimpleEs, query),
-                    ilike(studiesAi.briefSummaryEs, query),
-                    ilike(studiesAi.category, query),
-                    ilike(studiesAi.subcategory, query),
-                    ilike(studiesAi.keyEligibilityEs, query),
-                    // For tags, since it's jsonb, we might need a different approach if we want to search inside it.
-                    // But for now, let's stick to text fields.
-                )
-            );
-        }
-
+        const params = new URLSearchParams();
+        if (filters.query) params.append("q", filters.query);
         if (filters.phase && filters.phase.length > 0) {
-            whereConditions.push(
-                or(
-                    ...filters.phase.map(p => ilike(studiesRaw.phase, `%${p}%`)),
-                    ...filters.phase.map(p => ilike(studiesAi.phaseEs, `%${p}%`))
-                )
-            );
+            filters.phase.forEach((p: string) => params.append("phase", p));
         }
-
         if (filters.status && filters.status.length > 0) {
-            whereConditions.push(
-                or(...filters.status.map(s => eq(studiesRaw.overallStatus, s)))
-            );
+            filters.status.forEach((s: string) => params.append("status", s));
         }
 
-        const query = db
-            .select({
-                nct_id: studiesRaw.nctId,
-                title_es: studiesAi.titleEs,
-                title_simple_es: studiesAi.titleSimpleEs,
-                brief_summary_es: studiesAi.briefSummaryEs,
-                key_eligibility_es: studiesAi.keyEligibilityEs,
-                interventions_es: studiesAi.interventionsEs,
-                overall_status: studiesRaw.overallStatus,
-                phase_es: studiesAi.phaseEs,
-                category: studiesAi.category,
-                subcategory: studiesAi.subcategory,
-                tags: studiesAi.tags,
-                gender_target: studiesAi.genderTarget,
-                minimum_age: studiesRaw.minimumAge,
-                maximum_age: studiesRaw.maximumAge,
-                locations_json: studiesRaw.locationsJson,
-                lead_sponsor_name: studiesRaw.leadSponsorName,
-                last_update_post_date: studiesRaw.lastUpdatePostDate,
-                is_featured: studiesCustom.isFeatured,
-                is_recruiting: studiesRaw.isRecruiting,
-            })
-            .from(studiesRaw)
-            .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId));
+        const url = `${API_BASE_URL}${params.toString() ? `?${params.toString()}` : ""}`;
+        const response = await fetch(url);
 
-        if (whereConditions.length > 0) {
-            query.where(and(...whereConditions));
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
         }
 
-        const results = await query.limit(50);
+        const results = await response.json();
         return results;
 
     } catch (error) {
-        console.error("Error fetching studies:", error);
+        console.error("Error fetching studies from API:", error);
         return [];
     }
 }
 
 export async function getStudyById(id: string) {
     try {
-        const result = await db
-            .select({
-                nct_id: studiesRaw.nctId,
-                title_es: studiesAi.titleEs,
-                title_simple_es: studiesAi.titleSimpleEs,
-                brief_summary_es: studiesAi.briefSummaryEs,
-                key_eligibility_es: studiesAi.keyEligibilityEs,
-                structured_eligibility_json: studiesAi.structuredEligibilityJson,
-                interventions_es: studiesAi.interventionsEs,
-                overall_status: studiesRaw.overallStatus,
-                phase_es: studiesAi.phaseEs,
-                category: studiesAi.category,
-                subcategory: studiesAi.subcategory,
-                tags: studiesAi.tags,
-                gender_target: studiesAi.genderTarget,
-                minimum_age: studiesRaw.minimumAge,
-                maximum_age: studiesRaw.maximumAge,
-                locations_json: studiesRaw.locationsJson,
-                lead_sponsor_name: studiesRaw.leadSponsorName,
-                last_update_post_date: studiesRaw.lastUpdatePostDate,
-                is_featured: studiesCustom.isFeatured,
-                video_url: studiesCustom.videoUrl,
-                image_url: studiesCustom.imageUrl,
-            })
-            .from(studiesRaw)
-            .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId))
-            .where(eq(studiesRaw.nctId, id))
-            .limit(1);
+        const response = await fetch(`${API_BASE_URL}/${id}`);
 
-        if (!result.length) return null;
-        return result[0];
+        if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const study = await response.json();
+        return study;
     } catch (error) {
-        console.error("Error fetching study by ID:", error);
+        console.error("Error fetching study by ID from API:", error);
         return null;
     }
 }
