@@ -20,19 +20,39 @@ export async function getStudies(filters: SearchFilters = {}) {
         // Base query joining studiesRaw and studiesAi
         let conditions = [];
 
-        if (query) {
-            console.log(`[getStudies] Searching for query: "${query}"`);
-            const searchPattern = `%${query}%`;
-            conditions.push(
-                or(
-                    ilike(studiesAi.titleEs, searchPattern),
-                    ilike(studiesAi.titleSimpleEs, searchPattern),
-                    ilike(studiesRaw.briefTitle, searchPattern),
-                    ilike(studiesRaw.officialTitle, searchPattern),
-                    ilike(studiesAi.briefSummaryEs, searchPattern),
-                    ilike(studiesRaw.briefSummary, searchPattern),
-                    ilike(studiesRaw.primaryCondition, searchPattern)
+        // Define the weighted search rank using Postgres Full-Text Search (FTS)
+        // Weight A: 1.0 (Highest) - Spanish titles
+        // Weight B: 0.4 - Original titles and primary conditions
+        // Weight C: 0.2 - Summaries (Spanish)
+        // Weight D: 0.1 - Original summaries
+        const searchRank = query
+            ? sql<number>`
+                ts_rank_cd(
+                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.titleEs}, '')), 'A') ||
+                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.titleSimpleEs}, '')), 'A') ||
+                    setweight(to_tsvector('english', COALESCE(${studiesRaw.briefTitle}, '')), 'B') ||
+                    setweight(to_tsvector('english', COALESCE(${studiesRaw.officialTitle}, '')), 'B') ||
+                    setweight(to_tsvector('spanish', COALESCE(${studiesRaw.primaryCondition}, '')), 'B') ||
+                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.briefSummaryEs}, '')), 'C') ||
+                    setweight(to_tsvector('english', COALESCE(${studiesRaw.briefSummary}, '')), 'D'),
+                    websearch_to_tsquery('spanish', ${query})
                 )
+            `
+            : sql<number>`0`;
+
+        if (query) {
+            console.log(`[getStudies] FTS Searching for query: "${query}"`);
+            // Add condition that the query must match the document
+            conditions.push(
+                sql`(
+                    to_tsvector('spanish', COALESCE(${studiesAi.titleEs}, '')) ||
+                    to_tsvector('spanish', COALESCE(${studiesAi.titleSimpleEs}, '')) ||
+                    to_tsvector('english', COALESCE(${studiesRaw.briefTitle}, '')) ||
+                    to_tsvector('english', COALESCE(${studiesRaw.officialTitle}, '')) ||
+                    to_tsvector('spanish', COALESCE(${studiesRaw.primaryCondition}, '')) ||
+                    to_tsvector('spanish', COALESCE(${studiesAi.briefSummaryEs}, '')) ||
+                    to_tsvector('english', COALESCE(${studiesRaw.briefSummary}, ''))
+                ) @@ websearch_to_tsquery('spanish', ${query})`
             );
         }
 
@@ -43,20 +63,6 @@ export async function getStudies(filters: SearchFilters = {}) {
         if (status && status.length > 0) {
             conditions.push(inArray(studiesRaw.overallStatus, status));
         }
-
-        // Calculate relevance rank if query exists
-        // Use explicit concatenation to ensure the pattern is correct
-        const relevanceRank = query
-            ? sql<number>`
-                (CASE WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ('%' || ${query} || '%') THEN 2000 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ('%' || ${query} || '%') THEN 2000 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ('%' || ${query} || '%') THEN 1000 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ('%' || ${query} || '%') THEN 1000 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ('%' || ${query} || '%') THEN 500 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ('%' || ${query} || '%') THEN 100 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.briefSummary}, '') ILIKE ('%' || ${query} || '%') THEN 50 ELSE 0 END)
-            `
-            : sql<number>`0`;
 
         const results = await db
             .select({
@@ -74,23 +80,20 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
-                rank: relevanceRank,
+                rank: searchRank,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(
-                sql`${relevanceRank} DESC`,
+                desc(searchRank),
                 sql`${studiesRaw.lastUpdatePostDate} DESC NULLS LAST`
             )
             .limit(50);
 
         console.log(`[getStudies] Found ${results.length} results. Query: "${query}"`);
         if (results.length > 0) {
-            console.log(`[getStudies] Top 3 results:`);
-            results.slice(0, 3).forEach((r, i) => {
-                console.log(` ${i + 1}. ${r.nct_id} (Rank: ${r.rank}) - Title: ${r.title_es || r.brief_title}`);
-            });
+            console.log(`[getStudies] Top result: ${results[0].nct_id} (Rank: ${results[0].rank})`);
         }
 
         return results;
