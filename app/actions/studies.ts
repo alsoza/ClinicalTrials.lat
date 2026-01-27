@@ -21,24 +21,25 @@ export async function getStudies(filters: SearchFilters = {}) {
         let conditions = [];
 
         // Define a Hybrid Ranking System:
-        // 1. Exact Substring Match in Title (Highest Score: 50.0)
-        // 2. FTS Relevance (Variable Score: 0.0 - 1.0)
+        // 1. Exact Substring Match in Title/ID (Highest Score)
+        // 2. FTS Relevance (Fuzzy match)
 
         const titleMatchBoost = query ? sql<number>`
             (CASE 
-                WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ('%' || ${query} || '%') THEN 50.0
-                WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ('%' || ${query} || '%') THEN 50.0
-                WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ('%' || ${query} || '%') THEN 40.0
-                WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ('%' || ${query} || '%') THEN 40.0
-                WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ('%' || ${query} || '%') THEN 20.0
-                WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ('%' || ${query} || '%') THEN 5.0
-                ELSE 0 
+                WHEN ${studiesRaw.nctId} ILIKE ${query} THEN 100.0
+                WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ('%' || ${query} || '%') THEN 80.0
+                WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ('%' || ${query} || '%') THEN 80.0
+                WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ('%' || ${query} || '%') THEN 60.0
+                WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ('%' || ${query} || '%') THEN 60.0
+                WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ('%' || ${query} || '%') THEN 40.0
+                WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ('%' || ${query} || '%') THEN 10.0
+                ELSE 0.0 
             END)
-        ` : sql<number>`0`;
+        ` : sql<number>`0.0`;
 
         const ftsRank = query
             ? sql<number>`
-                ts_rank(
+                COALESCE(ts_rank(
                     setweight(to_tsvector('simple', COALESCE(${studiesAi.titleEs}, '')), 'A') ||
                     setweight(to_tsvector('simple', COALESCE(${studiesAi.titleSimpleEs}, '')), 'A') ||
                     setweight(to_tsvector('simple', COALESCE(${studiesRaw.briefTitle}, '')), 'B') ||
@@ -47,18 +48,24 @@ export async function getStudies(filters: SearchFilters = {}) {
                     setweight(to_tsvector('simple', COALESCE(${studiesAi.briefSummaryEs}, '')), 'C') ||
                     setweight(to_tsvector('simple', COALESCE(${studiesRaw.briefSummary}, '')), 'D'),
                     plainto_tsquery('simple', ${query})
-                )
+                ), 0.0)
             `
-            : sql<number>`0`;
+            : sql<number>`0.0`;
 
         const totalRank = sql`(${titleMatchBoost} + ${ftsRank})`;
 
         if (query) {
-            console.log(`[getStudies] Hybrid Searching for query: "${query}"`);
+            console.log(`[getStudies] Version 4.2 Searching for: "${query}"`);
             const searchPattern = `%${query}%`;
             conditions.push(
                 or(
-                    // FTS match
+                    eq(studiesRaw.nctId, query),
+                    ilike(studiesRaw.nctId, searchPattern),
+                    ilike(studiesAi.titleEs, searchPattern),
+                    ilike(studiesAi.titleSimpleEs, searchPattern),
+                    ilike(studiesRaw.briefTitle, searchPattern),
+                    ilike(studiesRaw.primaryCondition, searchPattern),
+                    ilike(studiesAi.briefSummaryEs, searchPattern),
                     sql`(
                         to_tsvector('simple', COALESCE(${studiesAi.titleEs}, '')) ||
                         to_tsvector('simple', COALESCE(${studiesAi.titleSimpleEs}, '')) ||
@@ -67,13 +74,7 @@ export async function getStudies(filters: SearchFilters = {}) {
                         to_tsvector('simple', COALESCE(${studiesRaw.primaryCondition}, '')) ||
                         to_tsvector('simple', COALESCE(${studiesAi.briefSummaryEs}, '')) ||
                         to_tsvector('simple', COALESCE(${studiesRaw.briefSummary}, ''))
-                    ) @@ plainto_tsquery('simple', ${query})`,
-                    // Plus ILIKE matches to ensure specific IDs are found even if FTS lexing differs
-                    ilike(studiesAi.titleEs, searchPattern),
-                    ilike(studiesAi.titleSimpleEs, searchPattern),
-                    ilike(studiesRaw.briefTitle, searchPattern),
-                    ilike(studiesRaw.primaryCondition, searchPattern),
-                    ilike(studiesAi.briefSummaryEs, searchPattern)
+                    ) @@ plainto_tsquery('simple', ${query})`
                 )
             );
         }

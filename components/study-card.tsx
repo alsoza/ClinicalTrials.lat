@@ -13,9 +13,10 @@ interface StudyCardProps {
     phase_es: string;
     key_eligibility_es?: string | null;
     is_featured?: boolean;
+    rank?: number;
 }
 
-export function StudyCard({ nct_id, title_es, category, locations_json, overall_status, phase_es, key_eligibility_es, is_featured }: StudyCardProps) {
+export function StudyCard({ nct_id, title_es, category, locations_json, overall_status, phase_es, key_eligibility_es, is_featured, rank }: StudyCardProps) {
     const statusColors: Record<string, string> = {
         "Recruiting": "bg-emerald-500 text-white shadow-sm shadow-emerald-200",
         "RECRUITING": "bg-emerald-500 text-white shadow-sm shadow-emerald-200",
@@ -55,6 +56,11 @@ export function StudyCard({ nct_id, title_es, category, locations_json, overall_
                     {is_featured && (
                         <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 uppercase tracking-wider">
                             Destacado
+                        </span>
+                    )}
+                    {rank !== undefined && (
+                        <span className="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 uppercase tracking-wider">
+                            Rank: {typeof rank === 'number' ? rank.toFixed(2) : rank}
                         </span>
                     )}
                 </div>
