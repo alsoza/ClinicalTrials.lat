@@ -1,5 +1,9 @@
 "use server";
 
+import { db } from "@/lib/db";
+import { studiesRaw, studiesAi } from "@/lib/db/schema";
+import { eq, or, ilike, and, sql, desc, inArray } from "drizzle-orm";
+
 export interface SearchFilters {
     query?: string;
     phase?: string[];
@@ -11,44 +15,106 @@ const API_BASE_URL = "https://api.clinicaltrials.lat/estudios";
 
 export async function getStudies(filters: SearchFilters = {}) {
     try {
-        const params = new URLSearchParams();
-        if (filters.query) params.append("q", filters.query);
-        if (filters.phase && filters.phase.length > 0) {
-            filters.phase.forEach((p: string) => params.append("phase", p));
-        }
-        if (filters.status && filters.status.length > 0) {
-            filters.status.forEach((s: string) => params.append("status", s));
+        const { query, phase, status } = filters;
+
+        // Base query joining studiesRaw and studiesAi
+        let conditions = [];
+
+        if (query) {
+            const searchPattern = `%${query}%`;
+            conditions.push(
+                or(
+                    ilike(studiesAi.titleEs, searchPattern),
+                    ilike(studiesAi.titleSimpleEs, searchPattern),
+                    ilike(studiesRaw.briefTitle, searchPattern),
+                    ilike(studiesAi.briefSummaryEs, searchPattern),
+                    ilike(studiesRaw.primaryCondition, searchPattern)
+                )
+            );
         }
 
-        const url = `${API_BASE_URL}${params.toString() ? `?${params.toString()}` : ""}`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+        if (phase && phase.length > 0) {
+            conditions.push(inArray(studiesRaw.phase, phase));
         }
 
-        const results = await response.json();
+        if (status && status.length > 0) {
+            conditions.push(inArray(studiesRaw.overallStatus, status));
+        }
+
+        // Calculate relevance rank if query exists
+        const relevanceRank = query
+            ? sql<number>`
+                (CASE WHEN ${studiesAi.titleEs} ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
+                (CASE WHEN ${studiesAi.titleSimpleEs} ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
+                (CASE WHEN ${studiesRaw.briefTitle} ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
+                (CASE WHEN ${studiesRaw.primaryCondition} ILIKE ${`%${query}%`} THEN 5 ELSE 0 END) +
+                (CASE WHEN ${studiesAi.briefSummaryEs} ILIKE ${`%${query}%`} THEN 2 ELSE 0 END)
+            `
+            : sql<number>`0`;
+
+        const results = await db
+            .select({
+                nct_id: studiesRaw.nctId,
+                brief_title: studiesRaw.briefTitle,
+                title_es: studiesAi.titleEs,
+                title_simple_es: studiesAi.titleSimpleEs,
+                brief_summary: studiesRaw.briefSummary,
+                brief_summary_es: studiesAi.briefSummaryEs,
+                overall_status: studiesRaw.overallStatus,
+                phase: studiesRaw.phase,
+                phase_es: studiesAi.phaseEs,
+                primary_condition: studiesRaw.primaryCondition,
+                category: studiesAi.category,
+                locations_json: studiesRaw.locationsJson,
+                key_eligibility_es: studiesAi.keyEligibilityEs,
+                rank: relevanceRank,
+            })
+            .from(studiesRaw)
+            .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(relevanceRank), desc(studiesRaw.lastUpdatePostDate))
+            .limit(50);
+
         return results;
 
     } catch (error) {
-        console.error("Error fetching studies from API:", error);
+        console.error("Error fetching studies from DB:", error);
         return [];
     }
 }
 
 export async function getStudyById(id: string) {
     try {
-        const response = await fetch(`${API_BASE_URL}/${id}`);
+        const results = await db
+            .select({
+                nct_id: studiesRaw.nctId,
+                brief_title: studiesRaw.briefTitle,
+                official_title: studiesRaw.officialTitle,
+                brief_summary: studiesRaw.briefSummary,
+                detailed_description: studiesRaw.detailedDescription,
+                overall_status: studiesRaw.overallStatus,
+                phase: studiesRaw.phase,
+                study_type: studiesRaw.studyType,
+                eligibility_criteria_raw: studiesRaw.eligibilityCriteriaRaw,
+                sex: studiesRaw.sex,
+                minimum_age: studiesRaw.minimumAge,
+                maximum_age: studiesRaw.maximumAge,
+                conditions: studiesRaw.conditions,
+                locations_json: studiesRaw.locationsJson,
+                title_es: studiesAi.titleEs,
+                title_simple_es: studiesAi.titleSimpleEs,
+                brief_summary_es: studiesAi.briefSummaryEs,
+                key_eligibility_es: studiesAi.keyEligibilityEs,
+            })
+            .from(studiesRaw)
+            .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
+            .where(eq(studiesRaw.nctId, id))
+            .limit(1);
 
-        if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error(`API error: ${response.status}`);
-        }
-
-        const study = await response.json();
-        return study;
+        if (results.length === 0) return null;
+        return results[0];
     } catch (error) {
-        console.error("Error fetching study by ID from API:", error);
+        console.error("Error fetching study by ID from DB:", error);
         return null;
     }
 }
