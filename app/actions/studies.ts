@@ -91,7 +91,7 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
-                is_featured: sql<boolean>`false`,
+                is_featured: sql`FALSE`.mapWith(Boolean),
                 rank: totalRank,
             })
             .from(studiesRaw)
@@ -107,7 +107,7 @@ export async function getStudies(filters: SearchFilters = {}) {
 
     } catch (error) {
         console.error("CRITICAL SEARCH ERROR:", error);
-        throw error; // Throw so Vercel logs it clearly
+        return [];
     }
 }
 
@@ -135,7 +135,7 @@ export async function getStudyById(id: string) {
                 brief_summary_es: studiesAi.briefSummaryEs,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 structured_eligibility_json: studiesAi.structuredEligibilityJson,
-                video_url: sql<string | null>`NULL`,
+                video_url: sql`NULL`.mapWith(String),
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))

@@ -20,17 +20,22 @@ export default function SearchPage() {
 
     useEffect(() => {
         const fetchStudies = async () => {
-            setIsLoading(true);
-            const query = (searchParams.get("q") || "").toLowerCase();
-            setSearchTerm(query);
+            try {
+                setIsLoading(true);
+                const query = (searchParams.get("q") || "").toLowerCase();
+                setSearchTerm(query);
 
-            const results = await getStudies({
-                query: query || undefined,
-                // Add more filters here if needed
-            });
+                const results = await getStudies({
+                    query: query || undefined,
+                });
 
-            setFilteredStudies(results);
-            setIsLoading(false);
+                setFilteredStudies(results || []);
+            } catch (error) {
+                console.error("Error fetching studies:", error);
+                setFilteredStudies([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         fetchStudies();
@@ -93,7 +98,7 @@ export default function SearchPage() {
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">
                                     Resultados <span className="text-slate-500 font-normal text-lg">({filteredStudies.length})</span>
-                                    <span className="ml-2 text-[10px] text-slate-300 font-light">v4.3.1-buildfix</span>
+                                    <span className="ml-2 text-[10px] text-slate-300 font-light">v4.3.4-final-fix</span>
                                 </h1>
                                 {initialQuery && (
                                     <p className="text-sm text-slate-500 mt-1">
