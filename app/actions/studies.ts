@@ -21,6 +21,7 @@ export async function getStudies(filters: SearchFilters = {}) {
         let conditions = [];
 
         if (query) {
+            console.log(`[getStudies] Searching for query: "${query}"`);
             const searchPattern = `%${query}%`;
             conditions.push(
                 or(
@@ -44,16 +45,16 @@ export async function getStudies(filters: SearchFilters = {}) {
         }
 
         // Calculate relevance rank if query exists
-        // Use COALESCE to avoid NULL results in the addition
+        // Use explicit concatenation to ensure the pattern is correct
         const relevanceRank = query
             ? sql<number>`
-                (CASE WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ${`%${query}%`} THEN 5 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ${`%${query}%`} THEN 2 ELSE 0 END) +
-                (CASE WHEN COALESCE(${studiesRaw.briefSummary}, '') ILIKE ${`%${query}%`} THEN 1 ELSE 0 END)
+                (CASE WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ('%' || ${query} || '%') THEN 2000 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ('%' || ${query} || '%') THEN 2000 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ('%' || ${query} || '%') THEN 1000 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ('%' || ${query} || '%') THEN 1000 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ('%' || ${query} || '%') THEN 500 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ('%' || ${query} || '%') THEN 100 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.briefSummary}, '') ILIKE ('%' || ${query} || '%') THEN 50 ELSE 0 END)
             `
             : sql<number>`0`;
 
@@ -72,13 +73,25 @@ export async function getStudies(filters: SearchFilters = {}) {
                 category: studiesAi.category,
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
+                last_update: studiesRaw.lastUpdatePostDate,
                 rank: relevanceRank,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
-            .orderBy(desc(relevanceRank), desc(studiesRaw.lastUpdatePostDate))
+            .orderBy(
+                sql`${relevanceRank} DESC`,
+                sql`${studiesRaw.lastUpdatePostDate} DESC NULLS LAST`
+            )
             .limit(50);
+
+        console.log(`[getStudies] Found ${results.length} results. Query: "${query}"`);
+        if (results.length > 0) {
+            console.log(`[getStudies] Top 3 results:`);
+            results.slice(0, 3).forEach((r, i) => {
+                console.log(` ${i + 1}. ${r.nct_id} (Rank: ${r.rank}) - Title: ${r.title_es || r.brief_title}`);
+            });
+        }
 
         return results;
 
