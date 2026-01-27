@@ -91,6 +91,7 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
+                is_featured: sql<boolean>`false`,
                 rank: totalRank,
             })
             .from(studiesRaw)
@@ -134,6 +135,7 @@ export async function getStudyById(id: string) {
                 brief_summary_es: studiesAi.briefSummaryEs,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 structured_eligibility_json: studiesAi.structuredEligibilityJson,
+                video_url: sql<string | null>`NULL`,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
