@@ -27,7 +27,9 @@ export async function getStudies(filters: SearchFilters = {}) {
                     ilike(studiesAi.titleEs, searchPattern),
                     ilike(studiesAi.titleSimpleEs, searchPattern),
                     ilike(studiesRaw.briefTitle, searchPattern),
+                    ilike(studiesRaw.officialTitle, searchPattern),
                     ilike(studiesAi.briefSummaryEs, searchPattern),
+                    ilike(studiesRaw.briefSummary, searchPattern),
                     ilike(studiesRaw.primaryCondition, searchPattern)
                 )
             );
@@ -42,13 +44,16 @@ export async function getStudies(filters: SearchFilters = {}) {
         }
 
         // Calculate relevance rank if query exists
+        // Use COALESCE to avoid NULL results in the addition
         const relevanceRank = query
             ? sql<number>`
-                (CASE WHEN ${studiesAi.titleEs} ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
-                (CASE WHEN ${studiesAi.titleSimpleEs} ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
-                (CASE WHEN ${studiesRaw.briefTitle} ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
-                (CASE WHEN ${studiesRaw.primaryCondition} ILIKE ${`%${query}%`} THEN 5 ELSE 0 END) +
-                (CASE WHEN ${studiesAi.briefSummaryEs} ILIKE ${`%${query}%`} THEN 2 ELSE 0 END)
+                (CASE WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ${`%${query}%`} THEN 10 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ${`%${query}%`} THEN 8 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ${`%${query}%`} THEN 5 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ${`%${query}%`} THEN 2 ELSE 0 END) +
+                (CASE WHEN COALESCE(${studiesRaw.briefSummary}, '') ILIKE ${`%${query}%`} THEN 1 ELSE 0 END)
             `
             : sql<number>`0`;
 
