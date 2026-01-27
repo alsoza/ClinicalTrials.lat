@@ -20,39 +20,61 @@ export async function getStudies(filters: SearchFilters = {}) {
         // Base query joining studiesRaw and studiesAi
         let conditions = [];
 
-        // Define the weighted search rank using Postgres Full-Text Search (FTS)
-        // Weight A: 1.0 (Highest) - Spanish titles
-        // Weight B: 0.4 - Original titles and primary conditions
-        // Weight C: 0.2 - Summaries (Spanish)
-        // Weight D: 0.1 - Original summaries
-        const searchRank = query
+        // Define a Hybrid Ranking System:
+        // 1. Exact Substring Match in Title (Highest Score: 50.0)
+        // 2. FTS Relevance (Variable Score: 0.0 - 1.0)
+
+        const titleMatchBoost = query ? sql<number>`
+            (CASE 
+                WHEN COALESCE(${studiesAi.titleEs}, '') ILIKE ('%' || ${query} || '%') THEN 50.0
+                WHEN COALESCE(${studiesAi.titleSimpleEs}, '') ILIKE ('%' || ${query} || '%') THEN 50.0
+                WHEN COALESCE(${studiesRaw.briefTitle}, '') ILIKE ('%' || ${query} || '%') THEN 40.0
+                WHEN COALESCE(${studiesRaw.officialTitle}, '') ILIKE ('%' || ${query} || '%') THEN 40.0
+                WHEN COALESCE(${studiesRaw.primaryCondition}, '') ILIKE ('%' || ${query} || '%') THEN 20.0
+                WHEN COALESCE(${studiesAi.briefSummaryEs}, '') ILIKE ('%' || ${query} || '%') THEN 5.0
+                ELSE 0 
+            END)
+        ` : sql<number>`0`;
+
+        const ftsRank = query
             ? sql<number>`
-                ts_rank_cd(
-                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.titleEs}, '')), 'A') ||
-                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.titleSimpleEs}, '')), 'A') ||
-                    setweight(to_tsvector('english', COALESCE(${studiesRaw.briefTitle}, '')), 'B') ||
-                    setweight(to_tsvector('english', COALESCE(${studiesRaw.officialTitle}, '')), 'B') ||
-                    setweight(to_tsvector('spanish', COALESCE(${studiesRaw.primaryCondition}, '')), 'B') ||
-                    setweight(to_tsvector('spanish', COALESCE(${studiesAi.briefSummaryEs}, '')), 'C') ||
-                    setweight(to_tsvector('english', COALESCE(${studiesRaw.briefSummary}, '')), 'D'),
-                    websearch_to_tsquery('spanish', ${query})
+                ts_rank(
+                    setweight(to_tsvector('simple', COALESCE(${studiesAi.titleEs}, '')), 'A') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesAi.titleSimpleEs}, '')), 'A') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesRaw.briefTitle}, '')), 'B') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesRaw.officialTitle}, '')), 'B') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesRaw.primaryCondition}, '')), 'B') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesAi.briefSummaryEs}, '')), 'C') ||
+                    setweight(to_tsvector('simple', COALESCE(${studiesRaw.briefSummary}, '')), 'D'),
+                    plainto_tsquery('simple', ${query})
                 )
             `
             : sql<number>`0`;
 
+        const totalRank = sql`(${titleMatchBoost} + ${ftsRank})`;
+
         if (query) {
-            console.log(`[getStudies] FTS Searching for query: "${query}"`);
-            // Add condition that the query must match the document
+            console.log(`[getStudies] Hybrid Searching for query: "${query}"`);
+            const searchPattern = `%${query}%`;
             conditions.push(
-                sql`(
-                    to_tsvector('spanish', COALESCE(${studiesAi.titleEs}, '')) ||
-                    to_tsvector('spanish', COALESCE(${studiesAi.titleSimpleEs}, '')) ||
-                    to_tsvector('english', COALESCE(${studiesRaw.briefTitle}, '')) ||
-                    to_tsvector('english', COALESCE(${studiesRaw.officialTitle}, '')) ||
-                    to_tsvector('spanish', COALESCE(${studiesRaw.primaryCondition}, '')) ||
-                    to_tsvector('spanish', COALESCE(${studiesAi.briefSummaryEs}, '')) ||
-                    to_tsvector('english', COALESCE(${studiesRaw.briefSummary}, ''))
-                ) @@ websearch_to_tsquery('spanish', ${query})`
+                or(
+                    // FTS match
+                    sql`(
+                        to_tsvector('simple', COALESCE(${studiesAi.titleEs}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesAi.titleSimpleEs}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesRaw.briefTitle}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesRaw.officialTitle}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesRaw.primaryCondition}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesAi.briefSummaryEs}, '')) ||
+                        to_tsvector('simple', COALESCE(${studiesRaw.briefSummary}, ''))
+                    ) @@ plainto_tsquery('simple', ${query})`,
+                    // Plus ILIKE matches to ensure specific IDs are found even if FTS lexing differs
+                    ilike(studiesAi.titleEs, searchPattern),
+                    ilike(studiesAi.titleSimpleEs, searchPattern),
+                    ilike(studiesRaw.briefTitle, searchPattern),
+                    ilike(studiesRaw.primaryCondition, searchPattern),
+                    ilike(studiesAi.briefSummaryEs, searchPattern)
+                )
             );
         }
 
@@ -80,21 +102,18 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
-                rank: searchRank,
+                rank: totalRank,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(
-                desc(searchRank),
+                sql`${totalRank} DESC`,
                 sql`${studiesRaw.lastUpdatePostDate} DESC NULLS LAST`
             )
             .limit(50);
 
-        console.log(`[getStudies] Found ${results.length} results. Query: "${query}"`);
-        if (results.length > 0) {
-            console.log(`[getStudies] Top result: ${results[0].nct_id} (Rank: ${results[0].rank})`);
-        }
+        console.log(`[getStudies] Results for "${query}": ${results.length}. Top: ${results[0]?.nct_id} Rank: ${results[0]?.rank}`);
 
         return results;
 
