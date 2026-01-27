@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { studiesRaw, studiesAi, studiesCustom } from "@/lib/db/schema";
+import { studiesRaw, studiesAi } from "@/lib/db/schema";
 import { eq, or, ilike, and, sql, desc, inArray } from "drizzle-orm";
 
 export interface SearchFilters {
@@ -11,13 +11,9 @@ export interface SearchFilters {
     condition?: string;
 }
 
-const API_BASE_URL = "https://api.clinicaltrials.lat/estudios";
-
 export async function getStudies(filters: SearchFilters = {}) {
     try {
         const { query, phase, status } = filters;
-
-        // Base query joining studiesRaw, studiesAi, and studiesCustom
         let conditions = [];
 
         // Define a Hybrid Ranking System:
@@ -55,26 +51,18 @@ export async function getStudies(filters: SearchFilters = {}) {
         const totalRank = sql`(${titleMatchBoost} + ${ftsRank})`;
 
         if (query) {
-            console.log(`[getStudies] Version 4.3 Searching for: "${query}"`);
+            console.log(`[getStudies] v4.4-recovery Searching for: "${query}"`);
             const searchPattern = `%${query}%`;
             conditions.push(
                 or(
                     eq(studiesRaw.nctId, query),
                     ilike(studiesRaw.nctId, searchPattern),
+                    ilike(studiesRaw.briefTitle, searchPattern),
+                    ilike(studiesRaw.officialTitle, searchPattern),
+                    ilike(studiesRaw.primaryCondition, searchPattern),
                     ilike(studiesAi.titleEs, searchPattern),
                     ilike(studiesAi.titleSimpleEs, searchPattern),
-                    ilike(studiesRaw.briefTitle, searchPattern),
-                    ilike(studiesRaw.primaryCondition, searchPattern),
-                    ilike(studiesAi.briefSummaryEs, searchPattern),
-                    sql`(
-                        to_tsvector('simple', COALESCE(${studiesAi.titleEs}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesAi.titleSimpleEs}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesRaw.briefTitle}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesRaw.officialTitle}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesRaw.primaryCondition}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesAi.briefSummaryEs}, '')) ||
-                        to_tsvector('simple', COALESCE(${studiesRaw.briefSummary}, ''))
-                    ) @@ plainto_tsquery('simple', ${query})`
+                    ilike(studiesAi.briefSummaryEs, searchPattern)
                 )
             );
         }
@@ -103,12 +91,10 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
-                is_featured: studiesCustom.isFeatured,
                 rank: totalRank,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(
                 sql`${totalRank} DESC`,
@@ -116,13 +102,11 @@ export async function getStudies(filters: SearchFilters = {}) {
             )
             .limit(50);
 
-        console.log(`[getStudies] Results for "${query}": ${results.length}. Top: ${results[0]?.nct_id} Rank: ${results[0]?.rank}`);
-
         return results;
 
     } catch (error) {
-        console.error("Error fetching studies from DB:", error);
-        return [];
+        console.error("CRITICAL SEARCH ERROR:", error);
+        throw error; // Throw so Vercel logs it clearly
     }
 }
 
@@ -150,11 +134,9 @@ export async function getStudyById(id: string) {
                 brief_summary_es: studiesAi.briefSummaryEs,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 structured_eligibility_json: studiesAi.structuredEligibilityJson,
-                video_url: studiesCustom.videoUrl,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId))
             .where(eq(studiesRaw.nctId, id))
             .limit(1);
 
@@ -162,6 +144,6 @@ export async function getStudyById(id: string) {
         return results[0];
     } catch (error) {
         console.error("Error fetching study by ID from DB:", error);
-        return null;
+        return null; // Don't throw here to avoid breaking the whole page if one study fails
     }
 }
