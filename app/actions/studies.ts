@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { studiesRaw, studiesAi } from "@/lib/db/schema";
+import { studiesRaw, studiesAi, studiesCustom } from "@/lib/db/schema";
 import { eq, or, ilike, and, sql, desc, inArray } from "drizzle-orm";
 
 export interface SearchFilters {
@@ -17,7 +17,7 @@ export async function getStudies(filters: SearchFilters = {}) {
     try {
         const { query, phase, status } = filters;
 
-        // Base query joining studiesRaw and studiesAi
+        // Base query joining studiesRaw, studiesAi, and studiesCustom
         let conditions = [];
 
         // Define a Hybrid Ranking System:
@@ -55,7 +55,7 @@ export async function getStudies(filters: SearchFilters = {}) {
         const totalRank = sql`(${titleMatchBoost} + ${ftsRank})`;
 
         if (query) {
-            console.log(`[getStudies] Version 4.2 Searching for: "${query}"`);
+            console.log(`[getStudies] Version 4.3 Searching for: "${query}"`);
             const searchPattern = `%${query}%`;
             conditions.push(
                 or(
@@ -103,10 +103,12 @@ export async function getStudies(filters: SearchFilters = {}) {
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 last_update: studiesRaw.lastUpdatePostDate,
+                is_featured: studiesCustom.isFeatured,
                 rank: totalRank,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
+            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(
                 sql`${totalRank} DESC`,
@@ -142,13 +144,17 @@ export async function getStudyById(id: string) {
                 maximum_age: studiesRaw.maximumAge,
                 conditions: studiesRaw.conditions,
                 locations_json: studiesRaw.locationsJson,
+                lead_sponsor_name: studiesRaw.leadSponsorName,
                 title_es: studiesAi.titleEs,
                 title_simple_es: studiesAi.titleSimpleEs,
                 brief_summary_es: studiesAi.briefSummaryEs,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
+                structured_eligibility_json: studiesAi.structuredEligibilityJson,
+                video_url: studiesCustom.videoUrl,
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
+            .leftJoin(studiesCustom, eq(studiesRaw.nctId, studiesCustom.nctId))
             .where(eq(studiesRaw.nctId, id))
             .limit(1);
 
