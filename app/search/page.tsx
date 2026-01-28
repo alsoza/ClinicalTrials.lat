@@ -98,7 +98,7 @@ export default function SearchPage() {
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">
                                     Resultados <span className="text-slate-500 font-normal text-lg">({filteredStudies.length})</span>
-                                    <span className="ml-2 text-[10px] text-slate-300 font-light">v4.3.4-final-fix</span>
+                                    <span className="ml-2 text-[10px] text-slate-300 font-light">v4.5.0-db-debug</span>
                                 </h1>
                                 {initialQuery && (
                                     <p className="text-sm text-slate-500 mt-1">
