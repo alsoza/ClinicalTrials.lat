@@ -139,7 +139,7 @@ export async function getStudyById(id: string) {
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .where(eq(studiesRaw.nctId, id))
+            .where(ilike(studiesRaw.nctId, id.trim()))
             .limit(1);
 
         if (results.length === 0) return null;
