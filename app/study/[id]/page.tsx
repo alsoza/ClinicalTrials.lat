@@ -49,6 +49,7 @@ export default async function StudyDetailsPage({ params }: { params: Promise<{ i
                             <h2 className="text-2xl font-bold text-slate-900 mb-6">Criterios de Elegibilidad</h2>
                             <EligibilityCriteria
                                 structured_eligibility_json={study.structured_eligibility_json}
+                                key_eligibility_es={study.key_eligibility_es}
                                 raw_criteria={study.eligibility_criteria_raw}
                             />
                         </section>

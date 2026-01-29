@@ -4,26 +4,18 @@ import { studiesRaw, studiesAi } from "./lib/db/schema";
 import { eq, ilike } from "drizzle-orm";
 
 async function run() {
-    const id = "NCT07064473";
+    const id = "NCT06737614";
     console.log(`Inspecting data for ${id}...`);
 
     const results = await db
         .select({
-            id: studiesRaw.nctId,
-            eligibility_criteria_raw: studiesRaw.eligibilityCriteriaRaw,
-            inclusion_criteria_raw: studiesRaw.inclusionCriteriaRaw,
-            exclusion_criteria_raw: studiesRaw.exclusionCriteriaRaw,
-            structured_eligibility_json: studiesAi.structuredEligibilityJson,
+            key: studiesAi.keyEligibilityEs
         })
-        .from(studiesRaw)
-        .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-        .where(ilike(studiesRaw.nctId, id))
+        .from(studiesAi)
+        .where(eq(studiesAi.nctId, id))
         .limit(1);
 
-    console.log("Full Eligibility Criteria Raw:");
-    console.log(results[0]?.eligibility_criteria_raw);
-    console.log("\nJSON Response:");
-    console.log(JSON.stringify(results, null, 2));
+    console.log(`Key Eligibility ES for ${id}:`, results[0]?.key);
     process.exit(0);
 }
 
