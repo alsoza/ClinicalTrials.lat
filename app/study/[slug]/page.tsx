@@ -5,12 +5,12 @@ import { EligibilityCriteria } from "@/components/eligibility-criteria";
 import { ContactWidget } from "@/components/contact-widget";
 import { VideoEmbed } from "@/components/video-embed";
 
-import { getStudyById } from "@/app/actions/studies";
+import { getStudyBySlugOrId } from "@/app/actions/studies";
 import { notFound } from "next/navigation";
 
-export default async function StudyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    const study = await getStudyById(id);
+export default async function StudyDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = await params;
+    const study = await getStudyBySlugOrId(slug);
 
     if (!study) {
         notFound();

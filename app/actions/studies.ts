@@ -90,6 +90,7 @@ export async function getStudies(filters: SearchFilters = {}) {
                 category: studiesAi.category,
                 locations_json: studiesRaw.locationsJson,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
+                slug: studiesAi.slug,
                 last_update: studiesRaw.lastUpdatePostDate,
                 is_featured: sql`FALSE`.mapWith(Boolean),
                 rank: totalRank,
@@ -111,7 +112,7 @@ export async function getStudies(filters: SearchFilters = {}) {
     }
 }
 
-export async function getStudyById(id: string) {
+export async function getStudyBySlugOrId(identifier: string) {
     try {
         const results = await db
             .select({
@@ -135,11 +136,17 @@ export async function getStudyById(id: string) {
                 brief_summary_es: studiesAi.briefSummaryEs,
                 key_eligibility_es: studiesAi.keyEligibilityEs,
                 structured_eligibility_json: studiesAi.structuredEligibilityJson,
+                slug: studiesAi.slug,
                 video_url: sql`NULL`.mapWith(String),
             })
             .from(studiesRaw)
             .leftJoin(studiesAi, eq(studiesRaw.nctId, studiesAi.nctId))
-            .where(ilike(studiesRaw.nctId, id.trim()))
+            .where(
+                or(
+                    ilike(studiesRaw.nctId, identifier.trim()),
+                    eq(studiesAi.slug, identifier.trim())
+                )
+            )
             .limit(1);
 
         if (results.length === 0) return null;

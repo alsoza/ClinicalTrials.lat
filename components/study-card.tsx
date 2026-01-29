@@ -12,11 +12,12 @@ interface StudyCardProps {
     overall_status: string;
     phase_es: string;
     key_eligibility_es?: string | null;
+    slug?: string | null;
     is_featured?: boolean;
     rank?: number;
 }
 
-export function StudyCard({ nct_id, title_es, category, locations_json, overall_status, phase_es, key_eligibility_es, is_featured, rank }: StudyCardProps) {
+export function StudyCard({ nct_id, title_es, category, locations_json, overall_status, phase_es, key_eligibility_es, slug, is_featured, rank }: StudyCardProps) {
     const statusColors: Record<string, string> = {
         "Recruiting": "bg-emerald-500 text-white shadow-sm shadow-emerald-200",
         "RECRUITING": "bg-emerald-500 text-white shadow-sm shadow-emerald-200",
@@ -70,7 +71,7 @@ export function StudyCard({ nct_id, title_es, category, locations_json, overall_
             </div>
 
             <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-                <Link href={`/study/${nct_id}`} className="before:absolute before:inset-0">
+                <Link href={`/study/${slug || nct_id}`} className="before:absolute before:inset-0">
                     {title_es}
                 </Link>
             </h3>
@@ -117,7 +118,7 @@ export function StudyCard({ nct_id, title_es, category, locations_json, overall_
                 </div>
 
                 <Link
-                    href={`/study/${nct_id}`}
+                    href={`/study/${slug || nct_id}`}
                     className="relative z-10 inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-white bg-primary rounded-md hover:bg-blue-700 transition-colors shadow-sm"
                 >
                     Ver detalles
