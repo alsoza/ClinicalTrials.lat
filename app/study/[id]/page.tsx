@@ -8,8 +8,9 @@ import { VideoEmbed } from "@/components/video-embed";
 import { getStudyById } from "@/app/actions/studies";
 import { notFound } from "next/navigation";
 
-export default async function StudyDetailsPage({ params }: { params: { id: string } }) {
-    const study = await getStudyById(params.id);
+export default async function StudyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const study = await getStudyById(id);
 
     if (!study) {
         notFound();
