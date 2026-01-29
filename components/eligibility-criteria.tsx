@@ -2,11 +2,43 @@ import { PlusCircle, MinusCircle } from "lucide-react";
 
 interface EligibilityCriteriaProps {
     structured_eligibility_json: any;
+    raw_criteria?: string | null;
 }
 
-export function EligibilityCriteria({ structured_eligibility_json }: EligibilityCriteriaProps) {
-    const inclusion: string[] = Array.isArray(structured_eligibility_json?.inclusion) ? structured_eligibility_json.inclusion : [];
-    const exclusion: string[] = Array.isArray(structured_eligibility_json?.exclusion) ? structured_eligibility_json.exclusion : [];
+export function EligibilityCriteria({ structured_eligibility_json, raw_criteria }: EligibilityCriteriaProps) {
+    let inclusion: string[] = Array.isArray(structured_eligibility_json?.inclusion) ? structured_eligibility_json.inclusion : [];
+    let exclusion: string[] = Array.isArray(structured_eligibility_json?.exclusion) ? structured_eligibility_json.exclusion : [];
+
+    // Fallback parser if structured data is missing or empty
+    if (inclusion.length === 0 && exclusion.length === 0 && raw_criteria) {
+        const parseCriteria = (text: string) => {
+            const lines = text.split('\n');
+            let currentSection: 'none' | 'inclusion' | 'exclusion' = 'none';
+            const inc: string[] = [];
+            const exc: string[] = [];
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (trimmed.toLowerCase().includes('inclusion criteria')) {
+                    currentSection = 'inclusion';
+                } else if (trimmed.toLowerCase().includes('exclusion criteria')) {
+                    currentSection = 'exclusion';
+                } else if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
+                    const content = trimmed.substring(1).trim();
+                    if (content) {
+                        if (currentSection === 'inclusion') inc.push(content);
+                        else if (currentSection === 'exclusion') exc.push(content);
+                    }
+                }
+            });
+            return { inc, exc };
+        };
+
+        const parsed = parseCriteria(raw_criteria);
+        if (parsed.inc.length > 0) inclusion = parsed.inc;
+        if (parsed.exc.length > 0) exclusion = parsed.exc;
+    }
+
     return (
         <div className="grid md:grid-cols-2 gap-12">
             <div>
@@ -16,18 +48,22 @@ export function EligibilityCriteria({ structured_eligibility_json }: Eligibility
                         <span className="text-sm font-bold uppercase tracking-wider">Criterios de Inclusión</span>
                     </div>
                 </div>
-                <ul className="space-y-5">
-                    {inclusion.map((item, index) => (
-                        <li key={index} className="flex items-start gap-4 group">
-                            <div className="mt-1.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center group-hover:bg-emerald-500 transition-colors duration-200">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:bg-white" />
-                            </div>
-                            <span className="text-slate-700 leading-relaxed font-medium text-[16px]">
-                                {item}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
+                {inclusion.length > 0 ? (
+                    <ul className="space-y-5">
+                        {inclusion.map((item, index) => (
+                            <li key={index} className="flex items-start gap-4 group">
+                                <div className="mt-1.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center group-hover:bg-emerald-500 transition-colors duration-200">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:bg-white" />
+                                </div>
+                                <span className="text-slate-700 leading-relaxed font-medium text-[16px]">
+                                    {item}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-slate-500 italic">No se especificaron criterios de inclusión.</p>
+                )}
             </div>
 
             <div>
@@ -37,18 +73,22 @@ export function EligibilityCriteria({ structured_eligibility_json }: Eligibility
                         <span className="text-sm font-bold uppercase tracking-wider">Criterios de Exclusión</span>
                     </div>
                 </div>
-                <ul className="space-y-5">
-                    {exclusion.map((item, index) => (
-                        <li key={index} className="flex items-start gap-4 group">
-                            <div className="mt-1.5 flex-shrink-0 w-5 h-5 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center group-hover:bg-rose-500 transition-colors duration-200">
-                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 group-hover:bg-white" />
-                            </div>
-                            <span className="text-slate-600 leading-relaxed font-medium text-[16px]">
-                                {item}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
+                {exclusion.length > 0 ? (
+                    <ul className="space-y-5">
+                        {exclusion.map((item, index) => (
+                            <li key={index} className="flex items-start gap-4 group">
+                                <div className="mt-1.5 flex-shrink-0 w-5 h-5 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center group-hover:bg-rose-500 transition-colors duration-200">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 group-hover:bg-white" />
+                                </div>
+                                <span className="text-slate-600 leading-relaxed font-medium text-[16px]">
+                                    {item}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-slate-500 italic">No se especificaron criterios de exclusión.</p>
+                )}
             </div>
         </div>
     );
